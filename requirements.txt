@@ -1,0 +1,7 @@
+KesslerGame==2.1.1
+scikit-fuzzy
+scipy
+packaging
+networkx
+matplotlib
+pygad

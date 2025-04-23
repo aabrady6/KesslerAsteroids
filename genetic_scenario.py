@@ -5,20 +5,36 @@
 
 import time
 
+import pygad
+
+from genetic_algo import GeneticAlgorithm
 from kesslergame import Scenario, KesslerGame, GraphicsType, TrainerEnvironment
 from graphics_both import GraphicsBoth
+from training.scott_dick_controller import ScottDickController
 
-from EGABML_team_controller import EGABMLTeamController
+from genetic_controller import GeneticTeamController
 
 my_test_scenario = Scenario(
     name="Test Scenario",
-    num_asteroids= 10,
+    asteroid_states=[
+        {"position": (200, 400), "angle": 0, "speed": 30, "size": 4},
+         {'position': (400, 600), 'angle': 30, 'speed': 30, 'size': 4},
+         {'position': (600, 400), 'angle': 0, 'speed': 30, 'size': 4},
+         {'position': (200, 200), 'angle': 0, 'speed': 60, 'size': 4},
+    ],
     ship_states=[
         {
             "position": (400, 400),
             "angle": 90,
             "lives": 3,
             "team": 1,
+            "mines_remaining": 3,
+        },
+        {
+            "position": (500, 500),
+            "angle": 90,
+            "lives": 3,
+            "team": 2,
             "mines_remaining": 3,
         },
     ],
@@ -36,12 +52,22 @@ game_settings = {
     "frequency": 30,
 }
 
-game = TrainerEnvironment(settings=game_settings)
+game = KesslerGame(settings=game_settings)
+#game = TrainerEnvironment(settings=game_settings)
+
+begin = time.time()
+ga = GeneticAlgorithm(game, my_test_scenario, GeneticTeamController, ScottDickController)
+best_solution = ga.train()
+end = time.time()
+print(f"TOTAL GA TIME - {int(end - begin)} seconds")
+
+print("\n---------------------------------------------------------------")
+print("Running with Best Solution:")
 game = KesslerGame(settings=game_settings)
 
 score, perf_data = game.run(
     scenario=my_test_scenario,
-    controllers=[EGABMLTeamController()],
+    controllers=[GeneticTeamController(best_solution), ScottDickController()],
 )
 
 print(score.stop_reason)

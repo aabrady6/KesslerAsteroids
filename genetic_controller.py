@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright Â© 2022 Thales. All Rights Reserved.
 # NOTICE: This file is subject to the license agreement defined in file 'LICENSE', which is part of
 # this source code package.
@@ -23,52 +24,105 @@ import math
 import numpy as np
 import matplotlib as plt
 
+'''
+These parameters were gentically optimized using the genetic_scenario.py, with 10 asteroids in the game scenario.
+The genetic algorithm was num_generations=5, num_parents_mating=4, sol_per_pop=8. Fitness fuction utilized a 
+weighting factor based on asteroids hit, accuray, and lives remaining.
 
-class EGABMLTeamController(KesslerController):
-    def __init__(self):
+Fitness = (Asteroids * 1) + (Accuracy * 100) - (Lives Lost * 30)
+'''
+genetic_params = {
+            "speed_RR": -160,
+            "speed_R": -126,
+            "speed_R_sig": 58.8,
+            "speed_S": -19,
+            "speed_S_sig": 56,
+            "speed_F": 111,
+            "speed_F_sig": 40,
+            "speed_FF": 139,
+            "distance_C": 156,
+            "distance_CM": 223,
+            "distance_CM_sig": 103,
+            "distance_M": 460,
+            "distance_M_sig": 140,
+            "distance_MF": 775,
+            "distance_MF_sig": 98,
+            "distance_F": 855,
+            "thrust_RR": -250,
+            "thrust_R": -274,
+            "thrust_R_sig": 100,
+            "thrust_S": -13,
+            "thrust_S_sig": 113,
+            "thrust_F": 245,
+            "thrust_F_sig": 104,
+            "thrust_FF": 248,
+            "enemy_dist_C": 150,
+            "danger_L": 5000
+        }
+
+class GeneticTeamController(KesslerController):
+    def __init__(self, params=genetic_params):
         self.eval_frames = 0 #What is this?
 
         self.iterator = 0 #For timing mines
         self.number_asteroids = 0 #For tracking number of asteroids remaining
 
+        #################################################################################################################
+        #DEFINE CONTROLS FOR THRUST
+        #################################################################################################################
         # Add antecedents for thrust and mines
-        distance_to_asteroid = ctrl.Antecedent(np.linspace(0, 1000, 200), 'distance_to_asteroid')
-        ship_speed = ctrl.Antecedent(np.linspace(-240, 240, 200), 'ship_speed')
-        thrust = ctrl.Consequent(np.linspace(-500, 500, 200), 'thrust')
+        distance_to_asteroid = ctrl.Antecedent(np.linspace(0, 1000, 10001), 'distance_to_asteroid')
+        ship_speed = ctrl.Antecedent(np.linspace(-240, 240, 1001), 'ship_speed')
+        thrust = ctrl.Consequent(np.linspace(-500, 500, 10001), 'thrust')
         
-        ship_speed['RR'] = fuzz.zmf(ship_speed.universe, -240, -150)  #Fast Reverse
-        ship_speed['R'] = fuzz.gaussmf(ship_speed.universe, -125, 50) #Reverse
-        ship_speed['S'] = fuzz.gaussmf(ship_speed.universe, 0, 60)    #Stop
-        ship_speed['F'] = fuzz.gaussmf(ship_speed.universe, 125, 50)  #Forward
-        ship_speed['FF'] = fuzz.smf(ship_speed.universe, 150, 240)    #Fast Forward
+        # define ship_speed with genetic parameters 
+        ship_speed['RR'] = fuzz.zmf(ship_speed.universe, -240, params['speed_RR'])   #Fast Reverse
+        ship_speed['R'] = fuzz.gaussmf(ship_speed.universe, params['speed_R'], params['speed_R_sig']) #Reverse
+        ship_speed['S'] = fuzz.gaussmf(ship_speed.universe, params['speed_S'], params['speed_S_sig']) #Stop
+        ship_speed['F'] = fuzz.gaussmf(ship_speed.universe, params['speed_F'], params['speed_F_sig']) #Forward
+        ship_speed['FF'] = fuzz.smf(ship_speed.universe, params['speed_FF'], 240)   #Fast Forward
 
-        # Define fuzzy sets for distance to asteroid
-        distance_to_asteroid['C'] = fuzz.zmf(distance_to_asteroid.universe, 0, 150)
-        distance_to_asteroid['CM'] = fuzz.gaussmf(distance_to_asteroid.universe, 225, 100)
-        distance_to_asteroid['M'] = fuzz.gaussmf(distance_to_asteroid.universe, 500, 150)
-        distance_to_asteroid['MF'] = fuzz.gaussmf(distance_to_asteroid.universe, 775, 100)
-        distance_to_asteroid['F'] = fuzz.smf(distance_to_asteroid.universe, 850, 1000)
+        # define distance_to_asteroid with genetic parameters 
+        distance_to_asteroid['C'] = fuzz.zmf(distance_to_asteroid.universe, 0, params['distance_C'])       #Close
+        distance_to_asteroid['CM'] = fuzz.gaussmf(distance_to_asteroid.universe, params['distance_CM'], params['distance_CM_sig']) #Close Medium
+        distance_to_asteroid['M'] = fuzz.gaussmf(distance_to_asteroid.universe, params['distance_M'], params['distance_M_sig'])   #Medium
+        distance_to_asteroid['MF'] = fuzz.gaussmf(distance_to_asteroid.universe, params['distance_MF'], params['distance_MF_sig']) #Medium Far
+        distance_to_asteroid['F'] = fuzz.smf(distance_to_asteroid.universe, params['distance_F'], 1000)       #Far
 
-        # Define fuzzy sets for thrust
-        thrust['RR'] = fuzz.zmf(thrust.universe, -500, -250)   #Fast Reverse
-        thrust['R'] = fuzz.gaussmf(thrust.universe, -250, 100) #Reverse
-        thrust['S'] = fuzz.gaussmf(thrust.universe, 0, 125)    #Stop
-        thrust['F'] = fuzz.gaussmf(thrust.universe, 250, 100)  #Forward
-        thrust['FF'] = fuzz.smf(thrust.universe, 250, 500)     #Fast Forward
+        # define thrust with genetic parameters 
+        thrust['RR'] = fuzz.zmf(thrust.universe, -500, params['thrust_RR'])   #Fast Reverse
+        thrust['R'] = fuzz.gaussmf(thrust.universe, params['thrust_R'], params['thrust_R_sig']) #Reverse
+        thrust['S'] = fuzz.gaussmf(thrust.universe, params['thrust_S'], params['thrust_S_sig']) #Stop
+        thrust['F'] = fuzz.gaussmf(thrust.universe, params['thrust_F'], params['thrust_F_sig']) #Forward
+        thrust['FF'] = fuzz.smf(thrust.universe, params['thrust_FF'], 500)   #Fast Forward
 
-        #DEBUGGING
-        #distance_to_asteroid.view()
-        #ship_speed.view()
-        #thrust.view()
-        #x = input("potato")
+
+        #################################################################################################################
+        #DEFINE CONTROLS FOR MINING
+        #################################################################################################################
+        distance_to_enemy = ctrl.Antecedent(np.linspace(0, 1000, 200), 'distance_to_enemy')
+        danger_level = ctrl.Antecedent(np.linspace(0, 6000, 200), 'danger_level')
+        drop_bomb = ctrl.Consequent(np.arange(-1,1,0.1), 'drop_bomb')
+
+        # define distance_to_enemy with genetic parameters
+        distance_to_enemy['C'] = fuzz.trimf(distance_to_enemy.universe, [0, 0, params['enemy_dist_C']])
+        distance_to_enemy['F'] = fuzz.smf(distance_to_enemy.universe, params['enemy_dist_C'] - 15, 1000) 
+
+        # define danger_level with genetic parameters
+        danger_level['L'] = fuzz.trimf(danger_level.universe, [0, 0, params['danger_L']])
+        danger_level['H'] = fuzz.smf(danger_level.universe, params['danger_L'] - 20, 6000) 
+
+        #Declare singleton fuzzy sets for the drop_bomb consequent; -1 -> don't fire, +1 -> fire; this will be  thresholded
+        #   and returned as the boolean 'fire'
+        drop_bomb['N'] = fuzz.trimf(drop_bomb.universe, [-1,-1,0.5])
+        drop_bomb['Y'] = fuzz.trimf(drop_bomb.universe, [0.5,1,1])
 
         #################################################################################################################
         #DEFINE CONTROLS FOR AUTO-TARGETING MODE
         #################################################################################################################
-
         # self.targeting_control is the targeting rulebase, which is static in this controller.      
         # Declare variables
-        bullet_time = ctrl.Antecedent(np.arange(0,1.0,0.01), 'bullet_time')
+        bullet_time = ctrl.Antecedent(np.arange(0,1.0,0.002), 'bullet_time')
         theta_delta = ctrl.Antecedent(np.arange(-1*math.pi/30,math.pi/30,0.1), 'theta_delta') # Radians due to Python
         ship_turn = ctrl.Consequent(np.arange(-180,180,1), 'ship_turn') # Degrees due to Kessler
         ship_fire = ctrl.Consequent(np.arange(-1,1,0.1), 'ship_fire')
@@ -161,6 +215,34 @@ class EGABMLTeamController(KesslerController):
         rule45 = ctrl.Rule(distance_to_asteroid['F'] & ship_speed['F'], thrust['FF'])
         rule46 = ctrl.Rule(distance_to_asteroid['F'] & ship_speed['FF'], thrust['FF'])
 
+        # Rules for mines - distance_to_enemy['C'] 
+        rule47 = ctrl.Rule(distance_to_enemy['C'] & danger_level['H'] & ship_speed['RR'], drop_bomb['Y'])
+        rule48 = ctrl.Rule(distance_to_enemy['C'] & danger_level['H'] & ship_speed['R'], drop_bomb['N'])
+        rule49 = ctrl.Rule(distance_to_enemy['C'] & danger_level['H'] & ship_speed['S'], drop_bomb['N'])
+        rule50 = ctrl.Rule(distance_to_enemy['C'] & danger_level['H'] & ship_speed['F'], drop_bomb['N'])
+        rule51 = ctrl.Rule(distance_to_enemy['C'] & danger_level['H'] & ship_speed['FF'], drop_bomb['Y'])
+
+        # Rules for mines - distance_to_enemy['C'] 
+        rule52 = ctrl.Rule(distance_to_enemy['C'] & danger_level['L'] & ship_speed['RR'], drop_bomb['Y'])
+        rule53 = ctrl.Rule(distance_to_enemy['C'] & danger_level['L'] & ship_speed['R'], drop_bomb['N'])
+        rule54 = ctrl.Rule(distance_to_enemy['C'] & danger_level['L'] & ship_speed['S'], drop_bomb['N'])
+        rule55 = ctrl.Rule(distance_to_enemy['C'] & danger_level['L'] & ship_speed['F'], drop_bomb['N'])
+        rule56 = ctrl.Rule(distance_to_enemy['C'] & danger_level['L'] & ship_speed['FF'], drop_bomb['Y'])
+
+        # Rules for mines - distance_to_enemy['F'] - danger high
+        rule57 = ctrl.Rule(distance_to_enemy['F'] & danger_level['H'] & ship_speed['RR'], drop_bomb['N'])
+        rule58 = ctrl.Rule(distance_to_enemy['F'] & danger_level['H'] & ship_speed['R'], drop_bomb['N'])
+        rule59= ctrl.Rule(distance_to_enemy['F'] & danger_level['H'] & ship_speed['S'], drop_bomb['N'])
+        rule60 = ctrl.Rule(distance_to_enemy['F'] & danger_level['H'] & ship_speed['F'], drop_bomb['N'])
+        rule61 = ctrl.Rule(distance_to_enemy['F'] & danger_level['H'] & ship_speed['FF'], drop_bomb['N'])
+
+        # Rules for mines - distance_to_enemy['F'] 
+        rule62 = ctrl.Rule(distance_to_enemy['F'] & danger_level['L'] & ship_speed['RR'], drop_bomb['N'])
+        rule63 = ctrl.Rule(distance_to_enemy['F'] & danger_level['L'] & ship_speed['R'], drop_bomb['N'])
+        rule64 = ctrl.Rule(distance_to_enemy['F'] & danger_level['L'] & ship_speed['S'], drop_bomb['N'])
+        rule65 = ctrl.Rule(distance_to_enemy['F'] & danger_level['L'] & ship_speed['F'], drop_bomb['N'])
+        rule66 = ctrl.Rule(distance_to_enemy['F'] & danger_level['L'] & ship_speed['FF'], drop_bomb['N'])
+
         thrust_rules = [
             rule22, rule23, rule24, rule25, rule26,  # distance_to_asteroid['C']
             rule27, rule28, rule29, rule30, rule31,  # distance_to_asteroid['CM']
@@ -169,8 +251,13 @@ class EGABMLTeamController(KesslerController):
             rule42, rule43, rule44, rule45, rule46   # distance_to_asteroid['F']
         ]
 
-     
-        
+        mine_rules = [
+            rule47, rule48, rule49, rule50, rule51,
+            rule52, rule53, rule54, rule55, rule56,
+            rule57, rule58, rule59, rule60, rule61,
+            rule62, rule63, rule64, rule65, rule66
+        ]
+
         # Declare the fuzzy controller, add the rules 
         # This is an instance variable, and thus available for other methods in the same object. See notes.                         
         # self.targeting_control = ctrl.ControlSystem([rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12, rule13, rule14, rule15])
@@ -200,10 +287,11 @@ class EGABMLTeamController(KesslerController):
 
         # Declare the fuzzy control systems
         self.thrust_control = ctrl.ControlSystem(thrust_rules)
+        self.mine_control = ctrl.ControlSystem(mine_rules)
 
         # Create control system simulations
         self.thrust_sim = ctrl.ControlSystemSimulation(self.thrust_control)
-
+        self.mine_sim = ctrl.ControlSystemSimulation(self.mine_control)
 
     #################################################################################################################
     #SHIP ACTIONS
@@ -288,12 +376,9 @@ class EGABMLTeamController(KesslerController):
             aster_speed = sqrt(a["velocity"][0] ** 2 + a["velocity"][1] ** 2).real
             paddingdistance = a["radius"] * 1.2 + ship_state["radius"] + 1
             curr_dist = tangentveclen
-
-            #add try/except block in case asteroid isn't moving
-            try:
-                strike_time = (curr_dist - paddingdistance) / (aster_speed)
-            except ZeroDivisionError:
-                strike_time = 10000 #Arbitrarily large
+            if aster_speed == 0:
+                aster_speed = 1
+            strike_time = (curr_dist - paddingdistance) / (aster_speed)
 
             #Create tangential vector
             tangentvec[0] = tangentvec[0] / tangentveclen
@@ -493,26 +578,22 @@ class EGABMLTeamController(KesslerController):
             fire = True
 
         #Mine special cases:
-        #Assume no mining unless proven otherwise.
-        drop_mine = False
-
         #Try to bomb the enemy if in similar or advantageous position
-        if dist_nearest_enemy < 150 and enemy_lives == 1 and ship_state["lives_remaining"] > 2:
-            if self.iterator > 120:
-                drop_mine = True
-                self.iterator = 0
-
-        #Try to bomb enemy if happen to be flying by
-        if dist_nearest_enemy < 150 and abs(ship_state["speed"]) >= 200 and ship_state["lives_remaining"] > 1:
-            if self.iterator > 120:
-                drop_mine = True
-                self.iterator = 0
-        
+        #Try to bomb enemy if happen to be flying by        
         #If about to die, drop suicide mine to get grave kills.
-        #I found this was great at sending asteroids at the SD controller, killing it, and getting a bunch
-        #of points in the process.
-        if ship_danger_level > 5000 and self.iterator > 100:
+
+        mining = ctrl.ControlSystemSimulation(self.mine_control,flush_after_run=1)
+        mining.input['distance_to_enemy'] = dist_nearest_enemy
+        mining.input['danger_level'] = ship_danger_level
+        mining.input['ship_speed'] = ship_state["speed"]
+        
+        mining.compute()
+
+        if mining.output['drop_bomb'] >= 0:
             drop_mine = True
+        else:
+            drop_mine = False
+
 
         self.eval_frames +=1
         
