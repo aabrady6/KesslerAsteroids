@@ -108,7 +108,7 @@ class GeneticAlgorithm:
         ga_instance = pygad.GA(
             num_generations=3,
             num_parents_mating=4,
-            sol_per_pop=8,
+            sol_per_pop=4,
             fitness_func=self.fitness_function,
             num_genes=len(self.gene_space),
             mutation_percent_genes=40,
